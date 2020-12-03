@@ -31,24 +31,6 @@ accounts.tidy <- select(accounts,
 
 View(accounts.recast)
 
-sum(is.na(accounts$birthCountry))
-
-#accounts$birthCountry %>% replace_na('Empty')3
-
-#temp <- recode(accounts$birthPlace, "?????" = "NULL")
-
-sum(accounts$birthPlace=="?????")
-
-colnames(accounts.recast)
-
-y <- accounts.recast$rbaValue
-x <- select(accounts.recast, c(avg_of_wd_90_days, avg_of_cash_wd_90_days, avg_of_dep_90_days))  
-
-lm.modal <- lm(y ~ x, data = accounts.recast)
-coef(lm.modal)
-
-glimpse(accounts.tidy) 
-
 # date columns are imported as char, here we convert them to date format
 accounts.recast <- accounts.tidy %>%
   mutate(customerType = as.numeric(customerType),
@@ -72,3 +54,33 @@ accounts.encoded <- accounts.recast %>%
          sep="_")
 
 View(accounts.encoded)
+
+sum(is.na(accounts$birthCountry))
+
+#accounts$birthCountry %>% replace_na('Empty')3
+
+#temp <- recode(accounts$birthPlace, "?????" = "NULL")
+
+sum(accounts$birthPlace=="?????")
+
+colnames(accounts.recast)
+
+#train %>% mutate(gender = factor(gender, levels = c("Male","Female"))) -> train
+#test %>% mutate(gender = factor(gender, levels = c("Male","Female"))) -> test
+
+#variables <- accounts.recast %>% select_if(is.numeric)   
+#variables %>% head(5)
+accounts.subset <- select(accounts.recast, c(avg_last_90_days, avg_last_30_days, avg_cash_deposit_90_days, rbaValue, rba_grade_desc))
+
+train <- accounts.subset[5001:224866,]
+test <- accounts.subset[1:5000,]
+
+#print the number of na values in every column
+sapply(train,function(x) sum(is.na(x)))
+
+#create the linear regression model
+lm.model <- lm(rbaValue ~ c(avg_last_90_days), data = train)
+predictions <- predict(lm.model, test)
+
+#summarize the model
+summary(lm.model)
