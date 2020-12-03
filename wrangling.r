@@ -83,7 +83,7 @@ logit.model <- glm(rba_grade_desc ~ avg_cash_deposit_90_days, family=binomial(li
 
 #variables <- accounts.recast %>% select_if(is.numeric)   
 #variables %>% head(5)
-account.logit.data.subset <- select(account.logit.data, c(avg_last_90_days, avg_last_30_days, avg_cash_deposit_90_days, rba_grade_desc))
+# account.logit.data.subset <- select(account.logit.data, c(avg_last_90_days, avg_last_30_days, avg_cash_deposit_90_days, rba_grade_desc))
 
 #calculate auc 
 library(ROCR)
