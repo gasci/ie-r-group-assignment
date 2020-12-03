@@ -66,12 +66,13 @@ sum(accounts$birthPlace=="?????")
 colnames(accounts.recast)
 
 View(account.logit.data )
+accounts.logit <- accounts.recast
+accounts.logit$rba_grade_desc[accounts.logit$rba_grade_desc != "Low"] <- 1
+accounts.logit$rba_grade_desc[accounts.logit$rba_grade_desc == "Low"] <- 0
+accounts.logit$rba_grade_desc = as.numeric(accounts.logit$rba_grade_desc)
 
-accounts.recast$rba_grade_desc = as.numeric(accounts.recast$rba_grade_desc)
-accounts.recast$rba_grade_desc[accounts.recast$rba_grade_desc != "Low"] <- 1
-accounts.recast$rba_grade_desc[accounts.recast$rba_grade_desc == "Low"] <- 0
-
-account.logit.data <- accounts.recast
+train <- accounts.logit[5001:224866,]
+test <- accounts.logit[1:5000,]
 
 
 
@@ -81,8 +82,6 @@ account.logit.data <- accounts.recast
 #variables %>% head(5)
 account.logit.data.subset <- select(account.logit.data, c(avg_last_90_days, avg_last_30_days, avg_cash_deposit_90_days, rba_grade_desc))
 
-train <- account.logit.data.subset[5001:224866,]
-test <- account.logit.data.subset[1:5000,]
 
 #print the number of na values in every column
 sapply(train, function(x) sum(is.na(x)))
