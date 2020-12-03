@@ -65,8 +65,53 @@ sum(accounts$birthPlace=="?????")
 
 colnames(accounts.recast)
 
-#train %>% mutate(gender = factor(gender, levels = c("Male","Female"))) -> train
+View(account.logit.data )
+
+accounts.recast$rba_grade_desc = as.numeric(accounts.recast$rba_grade_desc)
+accounts.recast$rba_grade_desc[accounts.recast$rba_grade_desc != "Low"] <- 1
+accounts.recast$rba_grade_desc[accounts.recast$rba_grade_desc == "Low"] <- 0
+
+account.logit.data <- accounts.recast
+
+
+
+##liner model
+
+#variables <- accounts.recast %>% select_if(is.numeric)   
+#variables %>% head(5)
+account.logit.data.subset <- select(account.logit.data, c(avg_last_90_days, avg_last_30_days, avg_cash_deposit_90_days, rba_grade_desc))
+
+train <- account.logit.data.subset[5001:224866,]
+test <- account.logit.data.subset[1:5000,]
+
+#print the number of na values in every column
+sapply(train, function(x) sum(is.na(x)))
+
+#create the model
+logit.model <- glm(rba_grade_desc ~ avg_cash_deposit_90_days, family=binomial(link='logit'), maxit = 100, data=test)
+
+#create the logit regression model
+predictions <- predict(logit.model, test)
+
+#summarize the model
+summary(logit.model)
+
+
+train %>% mutate(risk_value = factor(rba_grade_desc, levels = c( 0, 1))) -> train
 #test %>% mutate(gender = factor(gender, levels = c("Male","Female"))) -> test
+
+#calculate auc 
+library(ROCR)
+p <- predict(logit.model,newdata=train,type='response')
+pr <- prediction(p, train$rba_grade_desc)
+auc <- performance(pr, measure = "auc")
+auc <- auc@y.values[[1]]
+auc
+
+
+library(modelr)
+
+##liner model
 
 #variables <- accounts.recast %>% select_if(is.numeric)   
 #variables %>% head(5)
@@ -84,3 +129,8 @@ predictions <- predict(lm.model, test)
 
 #summarize the model
 summary(lm.model)
+
+#calculate root means squared error
+rmse(lm.model, test)
+
+
