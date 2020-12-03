@@ -16,7 +16,7 @@ accounts <- read_excel("data.xlsx",
                                      "text", "text", "numeric", "numeric"))
 
 
-# discard columns listed below
+# discard columns listed below - we are gonna have to change this line
 accounts.tidy <- select(accounts, 
                         -c(birthPlace,
                            extraNationality,
@@ -29,7 +29,23 @@ accounts.tidy <- select(accounts,
                            legal_Stat_desc, 
                            score_card_Desc)) %>%  na_if("NULL")
 
+View(accounts.recast)
 
+sum(is.na(accounts$birthCountry))
+
+#accounts$birthCountry %>% replace_na('Empty')3
+
+#temp <- recode(accounts$birthPlace, "?????" = "NULL")
+
+sum(accounts$birthPlace=="?????")
+
+colnames(accounts.recast)
+
+y <- accounts.recast$rbaValue
+x <- select(accounts.recast, c(avg_of_wd_90_days, avg_of_cash_wd_90_days, avg_of_dep_90_days))  
+
+lm.modal <- lm(y ~ x, data = accounts.recast)
+coef(lm.modal)
 
 glimpse(accounts.tidy) 
 
