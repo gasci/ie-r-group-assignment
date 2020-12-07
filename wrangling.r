@@ -4,6 +4,7 @@ library(readxl)
 library(tidyverse)
 library(reshape2)
 # import excel dataset and adjust column types
+# TODO: change to csv
 accounts <- read_excel("data.xlsx",
                        col_types = c("text", "text", "text", 
                                      "text", "numeric", "text", "text", 
@@ -65,6 +66,14 @@ accounts.tidy <- select(accounts.tidy,
                            date_of_assessment
                         ))
 
+# encoding rbagradedesc to 0 if low or 1 if medium or high
+accounts.tidy$rba_grade_desc[accounts.tidy$rba_grade_desc != "Low"] <- 1
+accounts.tidy$rba_grade_desc[accounts.tidy$rba_grade_desc == "Low"] <- 0
+accounts.tidy$rba_grade_desc = as.numeric(accounts.tidy$rba_grade_desc)
+
+
+
+
 
 # we are converting columns with levels to factors
 accounts.tidy.factored <- accounts.tidy %>%  mutate_at(c('customerType', 
@@ -83,6 +92,9 @@ accounts.tidy.factored.replaced_nas <- accounts.tidy.factored %>%
 accounts.tidy.factored.replaced_nas.dropped <- accounts.tidy.factored.replaced_nas %>% filter(!is.na(nationalityOriginal)) %>% 
   filter(!is.na(residentCountry)) %>% filter(!is.na(LEGAL_STA_CODE)) 
 
+sapply(accounts.tidy.factored.replaced_nas.dropped, function(x) sum(is.na(x)))
+
+
 # showing unique value for each column
 unique.values <- accounts.tidy.factored.replaced_nas %>% summarise(across(everything(), ~ length(unique(.x))))
 
@@ -92,15 +104,27 @@ percentage.na <- accounts.tidy.factored.replaced_nas.dropped %>% summarise(acros
 # view of our final data set to use in the logit regression model
 View(accounts.tidy.factored.replaced_nas.dropped)
 
-# create another data set name accounts.logit
-accounts.logit <- accounts.tidy.factored.replaced_nas.dropped
+
+numeric.accounts.tidy <-accounts.tidy.factored.replaced_nas.dropped %>% select_if(is.numeric)
+result <- round(cor(numeric.accounts.tidy), 2)
+melted_cormat <- melt(result)
+head(melted_cormat)
+
+
+ggplot(data = melted_cormat, aes(x=Var1, y=Var2, fill=value)) + 
+  geom_tile()
+
+
+# we find that avg_last_90, 30 and 10 are highly correlated
+# we could do PCA but we will discard 2 of them
+
+numeric.accounts.tidy.removed.cor <- numeric.accounts.tidy %>% select(-c(avg_last_30_days, avg_last_10_days))
 
 View(accounts.tidy.factored.replaced_nas.dropped)
 
-# following your instructions - 0 if low, 1 if medium or high
-accounts.logit$rba_grade_desc[accounts.logit$rba_grade_desc != "Low"] <- 1
-accounts.logit$rba_grade_desc[accounts.logit$rba_grade_desc == "Low"] <- 0
-accounts.logit$rba_grade_desc = as.numeric(accounts.logit$rba_grade_desc)
+# create another data set name accounts.logit
+# remove rbaValue from the dataset
+accounts.logit <- numeric.accounts.tidy.removed.cor %>% select(-c(rbaValue))
 
 # split data for training
 ## 75% of the sample size
@@ -114,22 +138,14 @@ train_ind <- sample(seq_len(nrow(accounts.logit)), size = smp_size)
 train <- accounts.logit[train_ind, ]
 test <- accounts.logit[-train_ind, ]
 
-View(train$rba_grade_desc)
 # count the number of NA values in the train data set
 sapply(train, function(x) sum(is.na(x)))
 
 # build the logit regression model
-logit.model <- glm(rba_grade_desc ~ avg_cash_deposit_90_days, family=binomial(link='logit'), maxit = 100, data=test)
-numeric.train <- train %>% select_if(is.numeric)
-result <- round(cor(numeric.train), 2)
+logit.model <- glm(rba_grade_desc ~ ., family=binomial(link='logit'), maxit = 100, data=test)
 
-melted_cormat <- melt(result)
-head(melted_cormat)
-
-ggplot(data = melted_cormat, aes(x=Var1, y=Var2, fill=value)) + 
-  geom_tile()
-
-result
+summary(logit.model)
+# could remove insignificant variables
 
 #calculate AUC 
 library(ROCR)
@@ -139,41 +155,50 @@ auc <- performance(pr, measure = "auc")
 auc <- auc@y.values[[1]]
 auc
 
+# test on test dataset to see if it's overfitted or not
+p <- predict(logit.model,newdata=test,type='response')
+pr <- prediction(p, test$rba_grade_desc)
+auc <- performance(pr, measure = "auc")
+auc <- auc@y.values[[1]]
+auc
 
-#create the logit regression model
-predictions <- predict(logit.model, test)
-
-#summarize the model
-summary(logit.model)
-
-
-train %>% mutate(risk_value = factor(rba_grade_desc, levels = c( 0, 1))) -> train
-#test %>% mutate(gender = factor(gender, levels = c("Male","Female"))) -> test
-
+# train: 0.6144642
+# test: 0.6146259
+# similar
 
 
 library(modelr)
 
 ##liner model
 
+accounts.linear <- numeric.accounts.tidy.removed.cor %>% select(-c(rba_grade_desc))
+
+# split data for training
+## 75% of the sample size
+smp_size <- floor(0.75 * nrow(accounts.linear))
+
+## set the seed to make your partition reproducible
+set.seed(123)
+train_ind <- sample(seq_len(nrow(accounts.linear)), size = smp_size)
+
+# resulting train and test splits
+train <- accounts.linear[train_ind, ]
+test <- accounts.linear[-train_ind, ]
+
+# count the number of NA values in the train data set
+sapply(train, function(x) sum(is.na(x)))
+
 #variables <- accounts.recast %>% select_if(is.numeric)   
 #variables %>% head(5)
-accounts.subset <- select(accounts.recast, c(avg_last_90_days, avg_last_30_days, avg_cash_deposit_90_days, rbaValue, rba_grade_desc))
-
-train <- accounts.subset[5001:224866,]
-test <- accounts.subset[1:5000,]
-
-#print the number of na values in every column
-sapply(train,function(x) sum(is.na(x)))
-
 #create the linear regression model
-lm.model <- lm(rbaValue ~ c(avg_last_90_days), data = train)
-predictions <- predict(lm.model, test)
+lm.model <- lm(rbaValue ~ ., data = train)
+# predictions <- predict(lm.model, test)
 
 #summarize the model
 summary(lm.model)
 
 #calculate root means squared error
+rmse(lm.model, train)
 rmse(lm.model, test)
 
 
