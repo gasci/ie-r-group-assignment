@@ -1,6 +1,24 @@
-library(readxl)
+#TODO: intro
+
+# library(readxl)
 library(tidyverse)
-accounts <- read_excel("data.xlsx",  
+# import excel dataset
+# accounts <- read_delim("data.csv", delim=";",   escape_double = FALSE, trim_ws=TRUE,
+#                        col_types = c("text", "text", "text", 
+#                                      "text", "numeric", "text", "text", 
+#                                      "numeric", "text", "text", "text", 
+#                                      "text", "numeric", "numeric", "text", 
+#                                      "text", "text", "text", "text", "text", 
+#                                      "numeric", "text", "numeric", "numeric", 
+#                                      "numeric", "numeric", "numeric", 
+#                                      "numeric", "numeric", "numeric", 
+#                                      "numeric", "numeric", "numeric", 
+#                                      "numeric", "numeric", "numeric", 
+#                                      "numeric", "numeric", "numeric", 
+#                                      "numeric", "numeric", "text", "text", 
+#                                      "text", "text", "numeric", "numeric"))
+
+accounts <- read_excel("data.xlsx",
                        col_types = c("text", "text", "text", 
                                      "text", "numeric", "text", "text", 
                                      "numeric", "text", "text", "text", 
@@ -14,17 +32,20 @@ accounts <- read_excel("data.xlsx",
                                      "numeric", "numeric", "numeric", 
                                      "numeric", "numeric", "text", "text", 
                                      "text", "text", "numeric", "numeric"))
+
 accounts.recast <- accounts %>%
-  mutate(customerType = as.numeric(customerType),
-         creationDate = parse_date(creationDate),
-         dateOfBirth = parse_date(dateOfBirth),
-         date_of_assessment = parse_date(date_of_assessment)) %>% 
-  mutate_if(is.character, list(~na_if(.,"NULL")))
+  mutate(customerType = as.numeric(customerType), # convert customerType to numeric
+         creationDate = parse_date(creationDate), # convert creationDate to date
+         dateOfBirth = parse_date(dateOfBirth),   # convert dateOfBirth to date
+         date_of_assessment = parse_date(date_of_assessment)) %>% # convert date_of_assessment to date
+  mutate_if(is.character, list(~na_if(.,"NULL"))) # convert string "NULL" to NA datatype in character columns
 
 accounts.cleaned <- accounts.recast %>%
-  mutate(birthPlace = str_replace(birthPlace, "[?]", replacement=NA_character_))
+  mutate(birthPlace = str_replace(birthPlace, "[?]", replacement=NA_character_)) # in column birthPlace, convert any string containing a "?" to an NA datatype
 
-
+# calculate percentage of missing NAs
+percentage.na <- accounts.cleaned %>% summarise(across(everything(), ~ sum(is.na(.x))/length(.x)))
+unique.values <- accounts.cleaned %>% summarise(across(everything(), ~ length(unique(.x))))
 # discard columns listed below - we are gonna have to change this line
 # accounts.tidy <- select(accounts, 
 #                         -c(birthPlace,
@@ -36,11 +57,31 @@ accounts.cleaned <- accounts.recast %>%
 #                            lastUpdate, 
 #                            ledgerCode, 
 #                            legal_Stat_desc, 
-#                            score_card_Desc)) %>%  
-  
+#                            score_card_Desc))  
 
-View(accounts.recast)
+# discarding columns with more than 50% of missing values
+accounts.tidy <- select(accounts.cleaned,
+                        -c(extraNationality,
+                           birthCountry,
+                           birthPlace,
+                           profession,
+                           giinCode,
+                           lastUpdate,
+                           GENDER, # removing gender although we could later decide to analyze it in depth (questions of gender inequality?)
+                           legal_Stat_desc,
+                           score_card_Desc
+                           ))
 
+# discarded because the columns are the same for everybody
+accounts.tidy <- select(accounts.tidy,
+                        -c(IsBlackListed,
+                           org_code, 
+                           ))
+# 
+
+
+# View(accounts.recast)
+View(accounts.tidy)
 # date columns are imported as char, here we convert them to date format
 
 
@@ -67,12 +108,12 @@ sum(is.na(accounts$birthCountry))
 
 #temp <- recode(accounts$birthPlace, "?????" = "NULL")
 
-sum(accounts$birthPlace=="?????")
-
-colnames(accounts.recast)
-
-View(account.logit.data )
-accounts.logit <- accounts.recast
+# sum(accounts$birthPlace=="?????")
+# 
+# colnames(accounts.recast)
+# 
+# View(account.logit.data )
+accounts.logit <- accounts.tidy
 accounts.logit$rba_grade_desc[accounts.logit$rba_grade_desc != "Low"] <- 1
 accounts.logit$rba_grade_desc[accounts.logit$rba_grade_desc == "Low"] <- 0
 accounts.logit$rba_grade_desc = as.numeric(accounts.logit$rba_grade_desc)
