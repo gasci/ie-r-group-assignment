@@ -2,7 +2,7 @@
 
 library(readxl)
 library(tidyverse)
-
+library(reshape2)
 # import excel dataset and adjust column types
 accounts <- read_excel("data.xlsx",
                        col_types = c("text", "text", "text", 
@@ -114,17 +114,23 @@ train_ind <- sample(seq_len(nrow(accounts.logit)), size = smp_size)
 train <- accounts.logit[train_ind, ]
 test <- accounts.logit[-train_ind, ]
 
+View(train$rba_grade_desc)
 # count the number of NA values in the train data set
 sapply(train, function(x) sum(is.na(x)))
 
 # build the logit regression model
 logit.model <- glm(rba_grade_desc ~ avg_cash_deposit_90_days, family=binomial(link='logit'), maxit = 100, data=test)
+numeric.train <- train %>% select_if(is.numeric)
+result <- round(cor(numeric.train), 2)
 
+melted_cormat <- melt(result)
+head(melted_cormat)
 
-result <- cor(train$rba_grade_desc, train$avg_cash_deposit_90_days)
+ggplot(data = melted_cormat, aes(x=Var1, y=Var2, fill=value)) + 
+  geom_tile()
 
+result
 
-train$rba_grade_desc
 #calculate AUC 
 library(ROCR)
 p <- predict(logit.model,newdata=train,type='response')
