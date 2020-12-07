@@ -70,13 +70,13 @@ accounts.tidy <- select(accounts.cleaned,
                            GENDER, # removing gender although we could later decide to analyze it in depth (questions of gender inequality?)
                            legal_Stat_desc,
                            score_card_Desc
-                           ))
+                        ))
 
 # discarded because the columns are the same for everybody
 accounts.tidy <- select(accounts.tidy,
                         -c(IsBlackListed,
                            org_code, 
-                           ))
+                        ))
 # 
 
 
