@@ -14,29 +14,35 @@ accounts <- read_excel("data.xlsx",
                                      "numeric", "numeric", "numeric", 
                                      "numeric", "numeric", "text", "text", 
                                      "text", "text", "numeric", "numeric"))
+accounts.recast <- accounts %>%
+  mutate(customerType = as.numeric(customerType),
+         creationDate = parse_date(creationDate),
+         dateOfBirth = parse_date(dateOfBirth),
+         date_of_assessment = parse_date(date_of_assessment)) %>% 
+  mutate_if(is.character, list(~na_if(.,"NULL")))
+
+accounts.cleaned <- accounts.recast %>%
+  mutate(birthPlace = str_replace(birthPlace, "[?]", replacement=NA_character_))
 
 
 # discard columns listed below - we are gonna have to change this line
-accounts.tidy <- select(accounts, 
-                        -c(birthPlace,
-                           extraNationality,
-                           birthCountry, 
-                           profession, 
-                           companyType, 
-                           giinCode, 
-                           lastUpdate, 
-                           ledgerCode, 
-                           legal_Stat_desc, 
-                           score_card_Desc)) %>%  na_if("NULL")
+# accounts.tidy <- select(accounts, 
+#                         -c(birthPlace,
+#                            extraNationality,
+#                            birthCountry, 
+#                            profession, 
+#                            companyType, 
+#                            giinCode, 
+#                            lastUpdate, 
+#                            ledgerCode, 
+#                            legal_Stat_desc, 
+#                            score_card_Desc)) %>%  
+  
 
 View(accounts.recast)
 
 # date columns are imported as char, here we convert them to date format
-accounts.recast <- accounts.tidy %>%
-  mutate(customerType = as.numeric(customerType),
-         creationDate = parse_date(creationDate),
-         dateOfBirth = parse_date(dateOfBirth),
-         date_of_assessment = parse_date(date_of_assessment))
+
 
 
 # generate dummy variables for "score_card" and "rba_grade_desc"
