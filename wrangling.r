@@ -1,23 +1,9 @@
 #TODO: intro
 
-# library(readxl)
+library(readxl)
 library(tidyverse)
-# import excel dataset
-# accounts <- read_delim("data.csv", delim=";",   escape_double = FALSE, trim_ws=TRUE,
-#                        col_types = c("text", "text", "text", 
-#                                      "text", "numeric", "text", "text", 
-#                                      "numeric", "text", "text", "text", 
-#                                      "text", "numeric", "numeric", "text", 
-#                                      "text", "text", "text", "text", "text", 
-#                                      "numeric", "text", "numeric", "numeric", 
-#                                      "numeric", "numeric", "numeric", 
-#                                      "numeric", "numeric", "numeric", 
-#                                      "numeric", "numeric", "numeric", 
-#                                      "numeric", "numeric", "numeric", 
-#                                      "numeric", "numeric", "numeric", 
-#                                      "numeric", "numeric", "text", "text", 
-#                                      "text", "text", "numeric", "numeric"))
 
+# import excel dataset and adjust column types
 accounts <- read_excel("data.xlsx",
                        col_types = c("text", "text", "text", 
                                      "text", "numeric", "text", "text", 
@@ -33,6 +19,7 @@ accounts <- read_excel("data.xlsx",
                                      "numeric", "numeric", "text", "text", 
                                      "text", "text", "numeric", "numeric"))
 
+# column type conversion
 accounts.recast <- accounts %>%
   mutate(customerType = as.numeric(customerType), # convert customerType to numeric
          creationDate = parse_date(creationDate), # convert creationDate to date
@@ -40,24 +27,12 @@ accounts.recast <- accounts %>%
          date_of_assessment = parse_date(date_of_assessment)) %>% # convert date_of_assessment to date
   mutate_if(is.character, list(~na_if(.,"NULL"))) # convert string "NULL" to NA datatype in character columns
 
+# in column birthPlace, convert any string containing a "?" to an NA datatype
 accounts.cleaned <- accounts.recast %>%
-  mutate(birthPlace = str_replace(birthPlace, "[?]", replacement=NA_character_)) # in column birthPlace, convert any string containing a "?" to an NA datatype
+  mutate(birthPlace = str_replace(birthPlace, "[?]", replacement=NA_character_)) 
 
 # calculate percentage of missing NAs
 percentage.na <- accounts.cleaned %>% summarise(across(everything(), ~ sum(is.na(.x))/length(.x)))
-unique.values <- accounts.cleaned %>% summarise(across(everything(), ~ length(unique(.x))))
-# discard columns listed below - we are gonna have to change this line
-# accounts.tidy <- select(accounts, 
-#                         -c(birthPlace,
-#                            extraNationality,
-#                            birthCountry, 
-#                            profession, 
-#                            companyType, 
-#                            giinCode, 
-#                            lastUpdate, 
-#                            ledgerCode, 
-#                            legal_Stat_desc, 
-#                            score_card_Desc))  
 
 # discarding columns with more than 50% of missing values
 accounts.tidy <- select(accounts.cleaned,
@@ -69,78 +44,94 @@ accounts.tidy <- select(accounts.cleaned,
                            lastUpdate,
                            GENDER, # removing gender although we could later decide to analyze it in depth (questions of gender inequality?)
                            legal_Stat_desc,
-                           score_card_Desc
+                           score_card_Desc,
+                           companyType
                         ))
+
+
+# discarding dateOfBirth because it gives no extra information
+accounts.tidy <- select(accounts.tidy,
+                        -c(dateOfBirth))
+
+# discarding ledgerCode because it is just a random number
+accounts.tidy <- select(accounts.tidy,
+                        -c(ledgerCode))
 
 # discarded because the columns are the same for everybody
 accounts.tidy <- select(accounts.tidy,
                         -c(IsBlackListed,
-                           org_code, 
+                           org_code,
+                           status,
+                           date_of_assessment
                         ))
-# 
 
 
-# View(accounts.recast)
-View(accounts.tidy)
-# date columns are imported as char, here we convert them to date format
+# we are converting columns with levels to factors
+accounts.tidy.factored <- accounts.tidy %>%  mutate_at(c('customerType', 
+                              'onboarding', 
+                              'residentStatus',
+                              'jointAccount',
+                              'LEGAL_STA_CODE',
+                              'rbaGradeAbrv',
+                              'score_card'), as.factor)
 
+# imputing NA values with median value (na.rm is TRUE to ignore NA values during median calculation)
+accounts.tidy.factored.replaced_nas <- accounts.tidy.factored %>%  
+    replace_na(list(age_in_year=median(accounts.tidy.factored$age_in_year, na.rm = TRUE)))
 
+# dropping rows for other columns that have NA values since the NA ratio is low
+accounts.tidy.factored.replaced_nas.dropped <- accounts.tidy.factored.replaced_nas %>% filter(!is.na(nationalityOriginal)) %>% 
+  filter(!is.na(residentCountry)) %>% filter(!is.na(LEGAL_STA_CODE)) 
 
-# generate dummy variables for "score_card" and "rba_grade_desc"
-accounts.encoded <- accounts.recast %>%
-  mutate(dummy.acc = 1) %>% # column with single value
-  spread(key = score_card, # column to spread
-         value = dummy.acc,
-         fill = 0,
-         sep = "_"
-  ) %>%
-  mutate(dummy.rba_grade=1) %>%
-  spread(key=rba_grade_desc,
-         value=dummy.rba_grade,
-         fill=0,
-         sep="_")
+# showing unique value for each column
+unique.values <- accounts.tidy.factored.replaced_nas %>% summarise(across(everything(), ~ length(unique(.x))))
 
-View(accounts.encoded)
+# showing the percentage of NA values in each column
+percentage.na <- accounts.tidy.factored.replaced_nas.dropped %>% summarise(across(everything(), ~ sum(is.na(.x))/length(.x)))
 
-sum(is.na(accounts$birthCountry))
+# view of our final data set to use in the logit regression model
+View(accounts.tidy.factored.replaced_nas.dropped)
 
-#accounts$birthCountry %>% replace_na('Empty')3
+# create another data set name accounts.logit
+accounts.logit <- accounts.tidy.factored.replaced_nas.dropped
 
-#temp <- recode(accounts$birthPlace, "?????" = "NULL")
+View(accounts.tidy.factored.replaced_nas.dropped)
 
-# sum(accounts$birthPlace=="?????")
-# 
-# colnames(accounts.recast)
-# 
-# View(account.logit.data )
-accounts.logit <- accounts.tidy
+# following your instructions - 0 if low, 1 if medium or high
 accounts.logit$rba_grade_desc[accounts.logit$rba_grade_desc != "Low"] <- 1
 accounts.logit$rba_grade_desc[accounts.logit$rba_grade_desc == "Low"] <- 0
 accounts.logit$rba_grade_desc = as.numeric(accounts.logit$rba_grade_desc)
 
-train <- accounts.logit[5001:224866,]
-test <- accounts.logit[1:5000,]
+# split data for training
+## 75% of the sample size
+smp_size <- floor(0.75 * nrow(accounts.logit))
 
+## set the seed to make your partition reproducible
+set.seed(123)
+train_ind <- sample(seq_len(nrow(accounts.logit)), size = smp_size)
+
+# resulting train and test splits
+train <- accounts.logit[train_ind, ]
+test <- accounts.logit[-train_ind, ]
+
+# count the number of NA values in the train data set
 sapply(train, function(x) sum(is.na(x)))
 
-#create the model
+# build the logit regression model
 logit.model <- glm(rba_grade_desc ~ avg_cash_deposit_90_days, family=binomial(link='logit'), maxit = 100, data=test)
 
-##liner model
 
-#variables <- accounts.recast %>% select_if(is.numeric)   
-#variables %>% head(5)
-# account.logit.data.subset <- select(account.logit.data, c(avg_last_90_days, avg_last_30_days, avg_cash_deposit_90_days, rba_grade_desc))
+result <- cor(train$rba_grade_desc, train$avg_cash_deposit_90_days)
 
-#calculate auc 
+
+train$rba_grade_desc
+#calculate AUC 
 library(ROCR)
 p <- predict(logit.model,newdata=train,type='response')
 pr <- prediction(p, train$rba_grade_desc)
 auc <- performance(pr, measure = "auc")
 auc <- auc@y.values[[1]]
 auc
-
-#print the number of na values in every column
 
 
 #create the logit regression model
