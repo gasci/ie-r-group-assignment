@@ -1,31 +1,31 @@
-#TODO: intro
-# load("data-wrangling.RData")
-library(readxl)
+load("data-wrangling.RData")
+library(tidymodels)
 library(tidyverse)
-# library(tidymodels)
-library(modelr)
+library(readxl)
 library(reshape2)
-# TODO: research rocr
-library(ROCR)
+# library(modelr)
+
+
+#library(workflows)
+
 # Alt + - for <- 
 # Ctrl + Shift + M for %>% 
 
 # import excel dataset and adjust column types
-# TODO: change to csv (maybe not)
-accounts <- read_excel("data.xlsx",
-                       col_types = c("text", "text", "text",
-                                     "text", "numeric", "text", "text",
-                                     "numeric", "text", "text", "text",
-                                     "text", "numeric", "numeric", "text",
-                                     "text", "text", "text", "text", "text",
-                                     "numeric", "text", "numeric", "numeric",
-                                     "numeric", "numeric", "numeric",
-                                     "numeric", "numeric", "numeric",
-                                     "numeric", "numeric", "numeric",
-                                     "numeric", "numeric", "numeric",
-                                     "numeric", "numeric", "numeric",
-                                     "numeric", "numeric", "text", "text",
-                                     "text", "text", "numeric", "numeric"))
+# accounts <- read_excel("data.xlsx",
+#                        col_types = c("text", "text", "text",
+#                                      "text", "numeric", "text", "text",
+#                                      "numeric", "text", "text", "text",
+#                                      "text", "numeric", "numeric", "text",
+#                                      "text", "text", "text", "text", "text",
+#                                      "numeric", "text", "numeric", "numeric",
+#                                      "numeric", "numeric", "numeric",
+#                                      "numeric", "numeric", "numeric",
+#                                      "numeric", "numeric", "numeric",
+#                                      "numeric", "numeric", "numeric",
+#                                      "numeric", "numeric", "numeric",
+#                                      "numeric", "numeric", "text", "text",
+#                                      "text", "text", "numeric", "numeric"))
 # "takes a while, we won't bother with making you wait"
 
 glimpse(accounts)
@@ -40,8 +40,12 @@ accounts.recast <- accounts %>%
 accounts.cleaned <- accounts.recast %>%
   mutate(birthPlace = str_replace(birthPlace, "[?]", replacement=NA_character_)) 
 
+# helper functions for inspecting the data
+unique_counter <- function(x) length(unique(x))
+na_counter <- function(x) sum(is.na(x))
+na_proportion <- function(x) mean(is.na(x))
+
 # calculate percentage of missing NAs
-na_proportion <- function(x) sum(is.na(x))/length(x)
 map_dbl(accounts.cleaned, na_proportion)
 
 # discarding columns with more than 50% of missing values
@@ -55,7 +59,7 @@ accounts.tidy <- select(accounts.cleaned,
                            GENDER, # removing gender although we could later decide to analyze it in depth (questions of gender inequality?)
                            legal_Stat_desc,
                            score_card_Desc,
-                           companyType
+                           companyType #49% of missing values
                         ))
 
 
@@ -66,8 +70,7 @@ accounts.tidy <- select(accounts.tidy,
 # discarding ledgerCode because it is just a random number
 accounts.tidy <- select(accounts.tidy,
                         -c(ledgerCode))
-# TODO: move unique_counter and na_counter to beginning and clarify
-unique_counter <- function(x) length(unique(x))
+
 map_dbl(accounts.tidy, unique_counter)
 
 # discarded because the columns are the same for everybody
@@ -80,7 +83,7 @@ accounts.tidy <- select(accounts.tidy,
 # encoding rbagradedesc to 0 if low or 1 if medium or high
 accounts.tidy$rba_grade_desc[accounts.tidy$rba_grade_desc != "Low"] <- 1
 accounts.tidy$rba_grade_desc[accounts.tidy$rba_grade_desc == "Low"] <- 0
-accounts.tidy$rba_grade_desc = as.numeric(accounts.tidy$rba_grade_desc)
+accounts.tidy$rba_grade_desc = as.factor(accounts.tidy$rba_grade_desc)
 
 
 
@@ -97,7 +100,9 @@ accounts.tidy.factored <- accounts.tidy %>%  mutate_at(c('customerType',
 
 # imputing NA values with median value (na.rm is TRUE to ignore NA values during median calculation)
 
+
 map_dbl(accounts.tidy.factored, na_counter)
+
 accounts.tidy.factored.replaced_nas <- accounts.tidy.factored %>%  
     replace_na(list(age_in_year=median(accounts.tidy.factored$age_in_year, na.rm = TRUE)))
 
@@ -115,113 +120,98 @@ rows_dropped <- nrow(accounts.tidy.factored.replaced_nas) - nrow(accounts.tidy.f
 print(paste("Dropped", rows_dropped, "rows out of", nrow(accounts.tidy.factored.replaced_nas)))
 
 # view of our final data set to use in the logit regression model
-View(accounts.tidy.factored.replaced_nas.dropped)
-# TODO: encode categorical variable as flag
+# View(accounts.tidy.factored.replaced_nas.dropped)
 
 # select numeric only since it is the only valid way to do a model
 numeric.accounts.tidy <- accounts.tidy.factored.replaced_nas.dropped %>% 
-  select_if(is.numeric)
+  select_if(function (col) !is.character(col))
 
-map_lgl(accounts.tidy.factored.replaced_nas.dropped, is.numeric)
+numeric.accounts.tidy %>% select_if(is.numeric) %>% gather() %>% ggplot(aes(value)) +
+  geom_histogram(bins = 500) + 
+  facet_wrap(~key, scales = 'free_x', ncol=2) + scale_y_continuous(trans='log10')
 
-result <- round(cor(numeric.accounts.tidy), 2)
+
+summary(numeric.accounts.tidy)
+
+
+
+result <- round(cor(select_if(numeric.accounts.tidy, is.numeric)), 2)
 melted_cormat <- melt(result)
 head(melted_cormat)
-
 
 ggplot(data = melted_cormat, aes(x=Var1, y=Var2, fill=value)) + 
   geom_tile() + theme(axis.text.x = element_text(angle = 45, hjust = 1)  )
 
-# TODO: print labels diagonally
 
 # we find that avg_last_90, 30 and 10 are highly correlated
 # we could do PCA but we will discard 2 of them
 
+
+
 numeric.accounts.tidy.removed.cor <- numeric.accounts.tidy %>% 
   select(-c(avg_last_30_days, avg_last_10_days))
 
-View(accounts.tidy.factored.replaced_nas.dropped)
-
-
-# modeling
-
-# create another data set name accounts.logit
-# remove rbaValue from the dataset
-accounts.logit <- numeric.accounts.tidy.removed.cor %>% select(-c(rbaValue))
-
-# split data for training
-## 75% of the sample size
-smp_size <- floor(0.75 * nrow(accounts.logit))
-
-## set the seed to make your partition reproducible
 set.seed(123)
-train_ind <- sample(seq_len(nrow(accounts.logit)), size = smp_size)
 
-# resulting train and test splits
-train <- accounts.logit[train_ind, ]
-test <- accounts.logit[-train_ind, ]
+kyc_data <- numeric.accounts.tidy
+map_dbl(numeric.accounts.tidy, na_proportion)
 
-# count the number of NA values in the train data set
-sapply(train, function(x) sum(is.na(x)))
+# setting up train-test split
 
-# build the logit regression model
-logit.model <- glm(rba_grade_desc ~ ., family=binomial(link='logit'), maxit = 100, data=train)
-# TODO: give more info on glm function
-summary(logit.model)
-# could remove insignificant variables
-
-#calculate AUC 
-
-p <- predict(logit.model,newdata=train,type='response')
-pr <- prediction(p, train$rba_grade_desc)
-auc <- performance(pr, measure = "auc")
-auc <- auc@y.values[[1]]
-auc
-
-# test on test dataset to see if it's overfitted or not
-p <- predict(logit.model,newdata=test,type='response')
-pr <- prediction(p, test$rba_grade_desc)
-auc <- performance(pr, measure = "auc")
-auc <- auc@y.values[[1]]
-auc
-
-# train: 0.6144642
-# test: 0.6146259
-# similar
+kyc_split <- initial_split(kyc_data, prop = 0.8)
+kyc_train <- training(kyc_split)
+kyc_test <- testing(kyc_split)
 
 
+# LOGISTIC CLASSIFICATION
+
+kyc_logit_recipe <- 
+  recipe(rba_grade_desc ~ ., data=kyc_data) %>% 
+  step_rm(rbaValue) %>% 
+  step_rm(all_predictors(), -all_numeric()) %>% 
+  step_normalize(all_predictors())
+  
+
+lr_model <- 
+  logistic_reg() %>% 
+  set_engine("glm") %>% 
+  set_mode("classification") # %>%
+  # set_args(threshold=0.6)
+
+lr_workflow <- workflow() %>% 
+  add_recipe(kyc_logit_recipe) %>% 
+  add_model(lr_model)
+
+lr_fit <- lr_workflow %>% last_fit(kyc_split)
+
+lr_performance <- lr_fit %>% collect_metrics()
+lr_performance
 
 
-##liner model
 
-accounts.linear <- numeric.accounts.tidy.removed.cor %>% select(-c(rba_grade_desc))
 
-# split data for training
-## 75% of the sample size
-smp_size <- floor(0.75 * nrow(accounts.linear))
+# LINEAR REGRESSION
 
-## set the seed to make your partition reproducible
-set.seed(123)
-train_ind <- sample(seq_len(nrow(accounts.linear)), size = smp_size)
+kyc_lm_recipe <- 
+  recipe(rbaValue ~ ., data=kyc_data) %>% 
+  step_rm(rba_grade_desc) %>% 
+  step_rm(all_predictors(), -all_numeric()) %>% 
+  step_normalize(all_predictors()) 
 
-# resulting train and test splits
-train <- accounts.linear[train_ind, ]
-test <- accounts.linear[-train_ind, ]
 
-# count the number of NA values in the train data set
-sapply(train, function(x) sum(is.na(x)))
 
-#variables <- accounts.recast %>% select_if(is.numeric)   
-#variables %>% head(5)
-#create the linear regression model
-lm.model <- lm(rbaValue ~ ., data = train)
-# predictions <- predict(lm.model, test)
+lm_model <- linear_reg() %>% 
+  set_engine("lm") %>% 
+  set_mode("regression")
 
-#summarize the model
-summary(lm.model)
+lm_workflow <- workflow() %>% 
+  add_recipe(kyc_lm_recipe) %>% 
+  add_model(lm_model)
 
-#calculate root means squared error
-rmse(lm.model, train)
-rmse(lm.model, test)
+lm_fit <- lm_workflow %>% last_fit(kyc_split)
+
+lm_performance <- lm_fit %>% collect_metrics()
+
+lm_performance
 
 
