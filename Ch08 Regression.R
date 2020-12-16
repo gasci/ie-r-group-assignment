@@ -4,7 +4,6 @@
 # requires packages car, gvlma, MASS, leaps to be installed  #
 # install.packages(c("car", "gvlma", "MASS", "leaps"))       #
 #------------------------------------------------------------#
-
 par(ask=TRUE)
 opar <- par(no.readonly=TRUE)
 
@@ -33,7 +32,6 @@ lines(women$height,fitted(fit2))
 
 
 # Enhanced scatterplot for women data
-library(car)
 library(car)
 scatterplot(weight ~ height, data=women,
             spread=FALSE, smoother.args=list(lty=2), pch=19,

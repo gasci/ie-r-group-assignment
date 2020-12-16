@@ -10,6 +10,11 @@ library(caret)
 library(ROCR)
 # Alt + - for <- 
 # Ctrl + Shift + M for %>% 
+library(corrplot)
+library(RColorBrewer)
+M <-cor(mtcars)
+corrplot(M, type="upper", order="hclust",
+         col=brewer.pal(n=8, name="RdYlBu"))
 
 
 #iris$newcol <- ifelse(iris$Species=="versicolor", 1,0)

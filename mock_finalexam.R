@@ -43,16 +43,27 @@ oot %>% mutate(ib_var_1=1-ib_var_1) %>% mutate(ib_var_2=1-ib_var_2) -> oot
 dev$ib_var_6[dev$ib_var_6 == 1] <- 5
 oot$ib_var_6[oot$ib_var_6 == 1] <- 5
 
-
 # 04) Drop variables "ib_var_7"   "ib_var_8"   "ib_var_9"   "ib_var_10"
+dev <- dev %>% select(-c(ib_var_7, ib_var_8, ib_var_9, ib_var_10))
+oot <- oot %>% select(-c(ib_var_7, ib_var_8, ib_var_9, ib_var_10))
 
 # XX) Calculate the square of all categorial nominal variables - "icn_var_22" "icn_var_23" "icn_var_24" 
+dev$icn_var_22 <- dev$icn_var_22^2
+dev$icn_var_23 <- dev$icn_var_23^2
+dev$icn_var_24 <- dev$icn_var_24^2
+oot$icn_var_22 <- oot$icn_var_22^2
+oot$icn_var_23 <- oot$icn_var_23^2
+oot$icn_var_24 <- oot$icn_var_24^2
 
 # YY) Divide column "ico_var_59" "ico_var_60" "ico_var_61" by ("ico_var_62"-1) 
 dev$ico_var_59 <- dev$ico_var_59/(dev$ico_var_62-1)
+dev$ico_var_60 <- dev$ico_var_60/(dev$ico_var_62-1)
+dev$ico_var_61 <- dev$ico_var_61/(dev$ico_var_62-1)
+oot$ico_var_59 <- oot$ico_var_59/(oot$ico_var_62-1)
+oot$ico_var_60 <- oot$ico_var_60/(oot$ico_var_62-1)
+oot$ico_var_61 <- oot$ico_var_61/(oot$ico_var_62-1)
 
 # than replace Inf with the maximum value of the given column without taking the inf into account, hint: use is.infinite
-
 
 ### HOW TO STUDY FOR THE FINAL EXAM!
 # 1 - Make sure you revise the group project!
@@ -110,7 +121,7 @@ url = 'http://mfalonso.pythonanywhere.com/rcourse_finalexam_uploadpredictions/mo
 # MAKE SURE YOU CHANGE user AND password BELOW TO YOUR CREDENTIALS TO http://mfalonso.pythonanywhere.com
 
 response <- POST(url, body = list(file = upload_file("test_pred.csv")),
-                 authenticate("user", "password"))
+                 authenticate("gokasci", "manyak44"))
 
 
 content(response, "text")
