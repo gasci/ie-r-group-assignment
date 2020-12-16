@@ -6,9 +6,16 @@ library(tidyverse)
 library(modelr)
 library(reshape2)
 # TODO: research rocr
+library(caret)
 library(ROCR)
 # Alt + - for <- 
 # Ctrl + Shift + M for %>% 
+
+
+#iris$newcol <- ifelse(iris$Species=="versicolor", 1,0)
+#mtcars %>% filter(mtcars$carb==1) %>% select(mpg, cyl, disp)  %>% arrange(desc(mpg)) -> newdf
+#is.na(mtcars$mpg)
+#complete.cases(mtcars$mpg)
 
 # import excel dataset and adjust column types
 # TODO: change to csv (maybe not)
@@ -84,8 +91,6 @@ accounts.tidy$rba_grade_desc = as.numeric(accounts.tidy$rba_grade_desc)
 
 
 
-
-
 # we are converting columns with levels to factors
 accounts.tidy.factored <- accounts.tidy %>%  mutate_at(c('customerType', 
                               'onboarding', 
@@ -97,19 +102,19 @@ accounts.tidy.factored <- accounts.tidy %>%  mutate_at(c('customerType',
 
 # imputing NA values with median value (na.rm is TRUE to ignore NA values during median calculation)
 
-map_dbl(accounts.tidy.factored, na_counter)
+#map_dbl(accounts.tidy.factored, na_counter)
 accounts.tidy.factored.replaced_nas <- accounts.tidy.factored %>%  
     replace_na(list(age_in_year=median(accounts.tidy.factored$age_in_year, na.rm = TRUE)))
 
 
-map_dbl(accounts.tidy.factored.replaced_nas, na_counter)
+#map_dbl(accounts.tidy.factored.replaced_nas, na_counter)
 
 # dropping observations for other columns that have NA values since the NA ratio is low
 accounts.tidy.factored.replaced_nas.dropped <- accounts.tidy.factored.replaced_nas %>% 
   filter(!is.na(nationalityOriginal)) %>% 
   filter(!is.na(residentCountry)) %>% 
   filter(!is.na(LEGAL_STA_CODE)) 
-map_dbl(accounts.tidy.factored.replaced_nas.dropped, na_counter)
+#map_dbl(accounts.tidy.factored.replaced_nas.dropped, na_counter)
 rows_dropped <- nrow(accounts.tidy.factored.replaced_nas) - nrow(accounts.tidy.factored.replaced_nas.dropped)
 
 print(paste("Dropped", rows_dropped, "rows out of", nrow(accounts.tidy.factored.replaced_nas)))
@@ -141,7 +146,6 @@ numeric.accounts.tidy.removed.cor <- numeric.accounts.tidy %>%
   select(-c(avg_last_30_days, avg_last_10_days))
 
 View(accounts.tidy.factored.replaced_nas.dropped)
-
 
 # modeling
 
@@ -221,7 +225,13 @@ lm.model <- lm(rbaValue ~ ., data = train)
 summary(lm.model)
 
 #calculate root means squared error
-rmse(lm.model, train)
-rmse(lm.model, test)
+predictions <- lm.model %>% predict(test)
+# Model performance
+# (a) Prediction error, RMSE
+RMSE(predictions, test$rbaValue)
+# (b) R-square
+R2(predictions, test$rbaValue)
+
+
 
 
